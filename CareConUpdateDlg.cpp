@@ -7,11 +7,54 @@
 #include "CareConUpdate.h"
 #include "CareConUpdateDlg.h"
 #include "afxdialogex.h"
+#include <TlHelp32.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
 
+namespace {
+	const wchar_t* kCareConExePath = L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.exe";
+
+	BOOL TerminateCareConIfRunning()
+	{
+		BOOL terminated = FALSE;
+		HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+		if (hSnapshot == INVALID_HANDLE_VALUE)
+			return FALSE;
+
+		PROCESSENTRY32 pe = { 0 };
+		pe.dwSize = sizeof(PROCESSENTRY32);
+		if (Process32First(hSnapshot, &pe))
+		{
+			do
+			{
+				if (_wcsicmp(pe.szExeFile, L"CareCon.exe") != 0)
+					continue;
+
+				HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE | SYNCHRONIZE, FALSE, pe.th32ProcessID);
+				if (!hProcess)
+					continue;
+
+				wchar_t processPath[MAX_PATH] = { 0 };
+				DWORD processPathLen = _countof(processPath);
+				if (QueryFullProcessImageName(hProcess, 0, processPath, &processPathLen) && _wcsicmp(processPath, kCareConExePath) == 0)
+				{
+					if (TerminateProcess(hProcess, 0))
+					{
+						WaitForSingleObject(hProcess, 5000);
+						terminated = TRUE;
+					}
+				}
+
+				CloseHandle(hProcess);
+			} while (Process32Next(hSnapshot, &pe));
+		}
+
+		CloseHandle(hSnapshot);
+		return terminated;
+	}
+}
 
 // CCareConUpdateDlg 대화 상자
 
@@ -112,13 +155,8 @@ UINT DownloadThread(LPVOID pParam) {
 
 
 LRESULT CCareConUpdateDlg::OnDownloadComplete(WPARAM wParam, LPARAM lParam) {
-	
-	// carecon.ini의 버전 정보를 레지스트리에 기록
-	TCHAR strVer[5];
-	CString Path;
-	Path.Format(_T("%s\\CareCon.ini"), L"C:\\Program Files (x86)\\METASTORY\\CareCon");
-	::GetPrivateProfileString(_T("Version"), _T("Ver"), 0, strVer, sizeof(strVer), Path);
-	SetRegistryStrValue(REG_USER, L"Software\\CareCon", L"version", strVer);
+
+	TerminateCareConIfRunning();
 
 	// 압축파일 삭제
 	CFile::Remove(L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.ini");
@@ -126,6 +164,13 @@ LRESULT CCareConUpdateDlg::OnDownloadComplete(WPARAM wParam, LPARAM lParam) {
 
 	CFile::Remove(L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.exe");
 	CFile::Rename(L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.ex_", L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.exe");
+
+	// carecon.ini의 버전 정보를 레지스트리에 기록
+	TCHAR strVer[5];
+	CString Path;
+	Path.Format(_T("%s\\CareCon.ini"), L"C:\\Program Files (x86)\\METASTORY\\CareCon");
+	::GetPrivateProfileString(_T("Version"), _T("Ver"), 0, strVer, sizeof(strVer), Path);
+	SetRegistryStrValue(REG_USER, L"Software\\CareCon", L"version", strVer);
 
 	AfxMessageBox(L"CareCon 업데이트가 완료되었습니다! CareCon을 재시작합니다.");
 
