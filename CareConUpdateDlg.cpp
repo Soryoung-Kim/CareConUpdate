@@ -89,10 +89,12 @@ BOOL CCareConUpdateDlg::OnInitDialog()
 UINT DownloadThread(LPVOID pParam) {
 	CCareConUpdateDlg* pDialog = reinterpret_cast<CCareConUpdateDlg*>(pParam);
 
-	CString strURL1 = L"https://new.bizstory.co.kr/data/CareCon/CareCon.ini";
+	CString strURL1 = L"https://new.bizstory.co.kr/data/CareCon/CareCon.in_";
 	CString strURL2 = L"https://new.bizstory.co.kr/data/CareCon/CareCon.ex_";
-	CString strFileName1 = L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.ini";
+
+	CString strFileName1 = L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.in_";
 	CString strFileName2 = L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.ex_";	
+
 
 	pDialog->m_Callback.m_pProgressCtrl = &pDialog->m_ProgressCtrl;
 
@@ -118,9 +120,10 @@ LRESULT CCareConUpdateDlg::OnDownloadComplete(WPARAM wParam, LPARAM lParam) {
 	::GetPrivateProfileString(_T("Version"), _T("Ver"), 0, strVer, sizeof(strVer), Path);
 	SetRegistryStrValue(REG_USER, L"Software\\CareCon", L"version", strVer);
 
-	AfxMessageBox(strVer);
-
 	// 압축파일 삭제
+	CFile::Remove(L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.ini");
+	CFile::Rename(L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.in_", L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.ini");
+
 	CFile::Remove(L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.exe");
 	CFile::Rename(L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.ex_", L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.exe");
 
