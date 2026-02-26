@@ -6,6 +6,7 @@
 #include "framework.h"
 #include "CareConUpdate.h"
 #include "CareConUpdateDlg.h"
+#include <shellapi.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -40,6 +41,30 @@ CCareConUpdateApp theApp;
 
 BOOL CCareConUpdateApp::InitInstance()
 {
+	HANDLE hToken = nullptr;
+	TOKEN_ELEVATION elevation = {};
+	DWORD dwSize = 0;
+	if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
+	{
+		BOOL bElevated = GetTokenInformation(hToken, TokenElevation, &elevation, sizeof(elevation), &dwSize);
+		CloseHandle(hToken);
+		hToken = nullptr;
+
+		if (bElevated && elevation.TokenIsElevated == 0)
+		{
+			TCHAR strPath[MAX_PATH] = { 0, };
+			::GetModuleFileName(nullptr, strPath, MAX_PATH);
+			INT_PTR nResult = (INT_PTR)ShellExecute(nullptr, _T("runas"), strPath, nullptr, nullptr, SW_SHOWNORMAL);
+			if (nResult > 32)
+			{
+				return FALSE;
+			}
+
+			AfxMessageBox(L"관리자 권한으로 업데이트를 실행할 수 없습니다. 업데이트를 종료합니다.");
+			return FALSE;
+		}
+	}
+
 	// 애플리케이션 매니페스트가 ComCtl32.dll 버전 6 이상을 사용하여 비주얼 스타일을
 	// 사용하도록 지정하는 경우, Windows XP 상에서 반드시 InitCommonControlsEx()가 필요합니다.
 	// InitCommonControlsEx()를 사용하지 않으면 창을 만들 수 없습니다.
@@ -104,4 +129,3 @@ BOOL CCareConUpdateApp::InitInstance()
 	// 반환합니다.
 	return FALSE;
 }
-

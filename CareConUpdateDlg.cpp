@@ -96,9 +96,9 @@ UINT DownloadThread(LPVOID pParam) {
 
 	pDialog->m_Callback.m_pProgressCtrl = &pDialog->m_ProgressCtrl;
 
-	URLDownloadToFile(NULL, strURL1, strFileName1, 0, &pDialog->m_Callback);
-	HRESULT hr = URLDownloadToFile(NULL, strURL2, strFileName2, 0, &pDialog->m_Callback);
-	if (SUCCEEDED(hr)) {
+	HRESULT hrIni = URLDownloadToFile(NULL, strURL1, strFileName1, 0, &pDialog->m_Callback);
+	HRESULT hrExe = URLDownloadToFile(NULL, strURL2, strFileName2, 0, &pDialog->m_Callback);
+	if (SUCCEEDED(hrIni) && SUCCEEDED(hrExe)) {
 		pDialog->PostMessage(WM_DOWNLOAD_COMPLETE, 0, 0);
 	}
 	else {
@@ -114,19 +114,33 @@ LRESULT CCareConUpdateDlg::OnDownloadComplete(WPARAM wParam, LPARAM lParam) {
 	// carecon.ini의 버전 정보를 레지스트리에 기록
 	TCHAR strVer[5];
 	CString Path;
-	Path.Format(_T("%s\\CareCon.ini"), L"C:\\Program Files (x86)\\METASTORY\\CareCon");
+	Path.Format(_T("%s\\CareCon.ini"), LR"(C:\Program Files (x86)\METASTORY\CareCon)");
 	::GetPrivateProfileString(_T("Version"), _T("Ver"), 0, strVer, sizeof(strVer), Path);
-	SetRegistryStrValue(REG_USER, L"Software\\CareCon", L"version", strVer);
+	SetRegistryStrValue(REG_USER, LR"(Software\CareCon)", L"version", strVer);
 
-	AfxMessageBox(strVer);
-
-	// 압축파일 삭제
-	CFile::Remove(L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.exe");
-	CFile::Rename(L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.ex_", L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.exe");
+	CString strExePath = LR"(C:\Program Files (x86)\METASTORY\CareCon\CareCon.exe)";
+	CString strDownloadedExePath = LR"(C:\Program Files (x86)\METASTORY\CareCon\CareCon.ex_)";
+	if (!::MoveFileEx(strDownloadedExePath, strExePath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+	{
+		DWORD dwError = ::GetLastError();
+		if ((dwError == ERROR_ACCESS_DENIED || dwError == ERROR_SHARING_VIOLATION) &&
+			::MoveFileEx(strDownloadedExePath, strExePath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_DELAY_UNTIL_REBOOT))
+		{
+			AfxMessageBox(L"CareCon.exe 파일이 사용 중입니다. 시스템 재부팅 후 업데이트가 적용됩니다.");
+		}
+		else
+		{
+			CString strError;
+			strError.Format(L"CareCon.exe 교체 실패 (오류 코드: %lu)", dwError);
+			AfxMessageBox(strError);
+			PostMessage(WM_CLOSE, 0, 0);
+			return 0;
+		}
+	}
 
 	AfxMessageBox(L"CareCon 업데이트가 완료되었습니다! CareCon을 재시작합니다.");
 
-	ShellExecute(nullptr, _T("runas"), L"C:\\Program Files (x86)\\METASTORY\\CareCon\\CareCon.exe", nullptr, nullptr, SW_SHOWNORMAL);
+	ShellExecute(nullptr, _T("runas"), strExePath, nullptr, nullptr, SW_SHOWNORMAL);
 	exit(1);
 	return 0;
 }
